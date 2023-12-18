@@ -1,0 +1,12 @@
+out/
+bundled/
+test/
+dist/
+default.cfg
+beautify.exe
+kurakura.compiled.py
+myproject/
+gcc/
+gcc.zip
+plugins.json
+plugins/
