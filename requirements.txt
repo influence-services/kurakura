@@ -1,2 +1,3 @@
 simple_chalk
 halo @ git+https://github.com/StarNumber12046/halo@master
+requests
