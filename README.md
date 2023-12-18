@@ -1,6 +1,11 @@
 # くらくら BETA
 A "dizzying"ly fast Python transpiler.    
 
+## Virus Scans
+- [Hybrid Analysis: Latest public beta](https://www.hybrid-analysis.com/sample/97f5168a104ddb96db1e035811d924cddba7adaf38447e7d8e96da272c4b304f)
+- [Only HTTP requests in the program, for self-extraction](https://github.com/probablyacai/dizzying-public/blob/main/kurakura.py#L144-L191) - [See Uncrustify (bundled), we use it for beautifying output](https://github.com/uncrustify/uncrustify/)
+- [The entry code where your specified command is run](https://github.com/probablyacai/dizzying-public/blob/main/kurakura.py#L2176)
+
 ## TL;DR
 KuraKura allows you to transpile Python, especially code that is PROS/VEXCode-oriented, into a beautiful set of C++ or C++20 code, automatically beautifying code and generating safe and easy-to-maintain code.   
 For those unwilling to read a fourteen year old's equivalent of a thesis project document, here are good links to look at to see if KuraKura is right for you.
