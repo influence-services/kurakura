@@ -4,7 +4,7 @@ A "dizzying"ly fast Python transpiler.
 ## Virus Scans
 - [VirusTotal: Latest public beta](https://www.virustotal.com/gui/file/53530bc949020db83ad69d9bad4f7138e53b4b6e13cdd4cf32e8f1e7d181363a/detection)
   - Hybrid Analysis (alternative) - https://www.hybrid-analysis.com/sample/97f5168a104ddb96db1e035811d924cddba7adaf38447e7d8e96da272c4b304f
-  - **Keep in mind** sandboxes most use the Python exe to run this, who usually flag for "suspicious activity" when running this, or mostly any, Python file.
+  - **Keep in mind** sandboxes mainly use an actual Python program to run this, who usually flag for "suspicious activity" when running this, or mostly any, Python file.
 - [Only HTTP requests in the program, for self-extraction](https://github.com/probablyacai/dizzying-public/blob/main/kurakura.py#L144-L191) - [See Uncrustify (bundled), we use it for beautifying output](https://github.com/uncrustify/uncrustify/)
 - [The entry code where your specified command is run](https://github.com/probablyacai/dizzying-public/blob/main/kurakura.py#L2176)
 
