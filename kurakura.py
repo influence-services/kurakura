@@ -450,7 +450,6 @@ def TransformAssign(node: ast.Assign):
                     defined_global_vars.append(node.targets[0].id)
                 if type(node.value) == ast.UnaryOp:
                     node.value.operand.id = node.targets[0].id
-                    # check if variable is already defined
                     if type(node.value.operand) == ast.Name:
                         if not node.targets[0].id in defined_variables:
                             defined_variables.append(node.targets[0].id)
@@ -1335,19 +1334,6 @@ if __name__ == "__main__":
                 os.remove(path + "/pkg.zip")
                 print(chalk.bold.green("Cleaned package!"))
             print(chalk.bold.green("All done!"))
-        #elif sys.argv[1] == "toolchain":
-        #    print(chalk.bold.green("Minifying toolchain..."))
-        #    text = io.open("kurakura.py", mode="r", encoding="utf-8").read()
-        #    min = python_minifier.minify(text)
-        #    io.open("dist/kurakura.py", mode="w", encoding="utf-8").write(min)
-        #    print(chalk.bold.green("Minified toolchain!"))
-        #    print(chalk.bold.green("Copying to main directory..."))
-        #    shutil.copyfile('dist/kurakura.py', 'kurakura.compiled.py')
-        #    print(chalk.bold.green("Copied to main directory!"))
-        #    print(chalk.bold.green("Cleaning up..."))
-        #    shutil.rmtree('dist')
-        #    print(chalk.bold.blue("You may now distribute the optimized toolchain."))
-        #    print(chalk.bold.green("All done!"))
         elif sys.argv[1] == "del":
             if sys.argv[2] == ".":
                 print(chalk.red.bold("Cannot delete current directory. Exiting!"))
