@@ -1,6 +1,11 @@
 # くらくら BETA
 A "dizzying"ly fast Python transpiler.    
 
+## Updated
+- Now requires Windows, specifically Windows 11 due to the use of the command line detections we use.
+  - This *may* work with other OSes, but keep in mind, it might not.
+- Run the GUI by double clicking kurakura.py and running with Python.
+
 ## Virus Scans
 - [VirusTotal: Latest public beta](https://www.virustotal.com/gui/file/53530bc949020db83ad69d9bad4f7138e53b4b6e13cdd4cf32e8f1e7d181363a/detection)
   - [Hybrid Analysis (alternative)](https://www.hybrid-analysis.com/sample/97f5168a104ddb96db1e035811d924cddba7adaf38447e7d8e96da272c4b304f)
@@ -27,10 +32,14 @@ For those unwilling to read a fourteen year old's equivalent of a thesis project
 - 😁 ION - Accepting only valid commands, all others are inferred as scripts if they end with the .py extension
 - 😁 Error Handling - Safe
 - 😭 Self Initialization - Unsafe, has the potential to overwrite existing files. **Will remain this way**
+- 😁 GUI - Safe - All features are fine.
 
 ## Stability Status
 **Relatively Stable** - Most features have been tested and should normally work well under test circumstances. However, sometimes code may break. Please make sure to keep a backup of your existing C++ code in case the code is modified in an unwanted manner by the transpiler.   
 **Current feature status**   
+- 😭 GUI
+    - 😉 Project features
+    - 😐 Plugins **Not implemented**
 - 😁 Imports
     - 😉 Namespace imports (via ```from namespaces.namespace import subnamespace```)
     - 😉 Header imports (via ```import local_header```)

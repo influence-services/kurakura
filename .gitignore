@@ -8,3 +8,7 @@ myproject/
 gcc/
 gcc.zip
 plugins.json
+azure/
+.vscode/
+.vscode/c_cpp_properties.json
+__pycache__/

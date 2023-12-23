@@ -24,18 +24,7 @@ def TransformIntoCalls(parsed):
             if tag.name == "groups":
                 time = TransformTimeToMS(tag.find("time").text)
                 groups = tag.find_all("group")
-                if not tag.find("rotate") and not tag.find("move"):
-                    for x in range(len(groups)):
-                        dir = groups[x].find("dir").text
-                        percent = 127 * (math.floor(int(groups[x].find("speed").text[0:-1])) / 100)
-                        flipped = percent
-                        if dir == "rev":
-                            flipped = -percent
-                        instructions.append(groups[x].find("name").text + ".move(" + str(flipped) + ");") 
-                    instructions.append(time)
-                    for x in range(len(groups)):
-                        instructions.append(groups[x].find("name").text + ".move(0);")
-                elif tag.find("move"):
+                if tag.find("move"):
                     dir = tag.find("move").text
                     percent = 127 * (math.floor(int(tag.find("speed").text[:-1])) / 100)
                     flipped = percent

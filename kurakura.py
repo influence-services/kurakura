@@ -11,7 +11,34 @@ import subprocess
 import zipfile
 import types
 import traceback as tb
+import importlib
 import json
+import tkinter as tk
+from tkinter import ttk
+import win32gui, win32con
+import ctypes
+import subprocess
+
+is_console = False
+
+kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+process_array = (ctypes.c_uint * 1)()
+num_processes = kernel32.GetConsoleProcessList(process_array, 1)
+
+if num_processes == 3:
+    is_console = True
+else:
+    is_console = False
+
+log_hooks = []
+def hookLogging(func):
+    log_hooks.append(func)
+
+_print = print
+def print(*args, **kw):
+    for hook in log_hooks:
+        hook(*args, **kw)
+    _print(*args, **kw)
 
 if not os.path.isfile('plugins.json'):
     print(chalk.bold.red("Plugins file doesn't exist."))
@@ -29,11 +56,7 @@ header = "#pragma once;\n"
 inFunction = False
 
 print(chalk.bold.magenta("くらくら!"))
-print(
-    chalk.cyanBright(
-        "You are on the beta branch.\nThis branch is unstable, but will be updated based on bugs.\nA stable, public release will be available next season!"
-    )
-)
+print(chalk.cyanBright("Hello."))
 
 def readSpecifiedLine(file, line):
     return io.open(file, mode="r", encoding="utf-8").readlines()[line - 1]
@@ -123,6 +146,7 @@ else:
     s = req.get('https://raw.githubusercontent.com/uncrustify/uncrustify/master/documentation/htdocs/default.cfg', allow_redirects=True)
     open('default.cfg', 'wb').write(s.content)
     halo.succeed(text='Downloaded default config.')
+
     
 
 def parse(fileName, path):
@@ -450,6 +474,7 @@ def TransformAssign(node: ast.Assign):
                     defined_global_vars.append(node.targets[0].id)
                 if type(node.value) == ast.UnaryOp:
                     node.value.operand.id = node.targets[0].id
+                    # check if variable is already defined
                     if type(node.value.operand) == ast.Name:
                         if not node.targets[0].id in defined_variables:
                             defined_variables.append(node.targets[0].id)
@@ -458,7 +483,6 @@ def TransformAssign(node: ast.Assign):
                     for x in defined_variables:
                         if x == node.targets[0].id:
                             exists = True
-                    print(exists)
                     content += (transformInternalGetTypeName(node.value) + " " if not exists else "") + node.targets[0].id + " = " + transformInternalGetOpName(node.value.op) + node.value.operand.id + ";\n"
                 elif type(node.value) == ast.Constant:
                     if not isDefined:
@@ -1165,16 +1189,19 @@ def TransformClassMethod(node: ast.FunctionDef):
     return node
 
 def Transform(node: ast.AST):
-        global content
+        global content, header
         cancelled = False
         for x in plugins:
-            p = importlib.import_module("plugins." + x)
+            p = importlib.import_module("." + x.split(".")[0], package="plugins")
             for x1 in p.Transformers:
-                if not x1(node, {
+                val = x1(node, {
                     "content": content,
                     "header": header
-                }):
-                    cancelled = True
+                })
+                if not val == True:
+                    content += val['content']
+                    header += val['header']
+                    return
         if cancelled:
             return node
         if isinstance(node, ast.FunctionDef):
@@ -1234,252 +1261,285 @@ def detect_project(path):
         return False
 
 if __name__ == "__main__":
-    oldTotalTime = time.time()
-    success = False
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "remake":
-            path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
-            if os.path.exists(path):
-                print(chalk.green.bold("Folder exists!"))
-            else:
-                print(chalk.red.bold("Folder does not exist. Exiting!"))
-                sys.exit(1)
-            halo = Halo(text='Remaking project...', spinner='dots')
-            halo._text = "Copying myself..."
-            shutil.copyfile('kurakura.py', path + '/kurakura.py')
-            halo._text = "Copying default.cfg..."
-            shutil.copyfile('default.cfg', path + '/default.cfg')
-            halo._text = "Copying uncrustify..."
-            shutil.copyfile('beautify.exe', path + '/beautify.exe')
-            halo.succeed("Done!")
-        elif sys.argv[1] == "script":
-            print(chalk.bold.green("KuraScript v1.0.0"))
-            inferredScriptPath = sys.argv[2] if len(sys.argv) > 2 else None
-            if not inferredScriptPath or not os.path.exists(inferredScriptPath):
-                print(chalk.bold.yellow("Script doesn't exist. Inferring..."))
-                inferredScriptPath = "compile.kura"
-                if not os.path.exists(inferredScriptPath):
-                    print(chalk.bold.red("Script doesn't exist. Exiting!"))
+    if os.name == 'nt' and 'PROMPT' in os.environ or not sys.stdin.isatty() or not is_console:
+        if not os.path.exists('gui.py'):
+            window = tk.Tk()
+            label = tk.Label(window, text="Give me a second...")
+            progress = ttk.Progressbar(window, orient=tk.HORIZONTAL, length=300, mode='indeterminate')
+            label.pack()
+            progress.pack()
+            window.title("Downloading GUI...")
+            window.geometry("300x100")
+            window.resizable(False, False)
+            progress.start()
+            window.mainloop()
+            d = req.get('https://raw.githubusercontent.com/probablyacai/dizzying-public/main/gui.py')
+            open('gui.py', 'w').write(d.text)
+            window.destroy()
+        subprocess.Popen("py gui.py", shell=True,
+             stdin=None, stdout=None, stderr=None, close_fds=True, creationflags=0x00000008)
+        sys.exit(0)
+    else:
+        oldTotalTime = time.time()
+        success = False
+        if len(sys.argv) > 1:
+            if sys.argv[1] == "remake":
+                path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
+                if os.path.exists(path):
+                    print(chalk.green.bold("Folder exists!"))
+                else:
+                    print(chalk.red.bold("Folder does not exist. Exiting!"))
                     sys.exit(1)
-                iLine = 0
-                compiled = False
-                endedCompilation = False
-                for x in open(inferredScriptPath, "r").read().split("\n"):
-                    iLine += 1
-                    if x.startswith("Compile-Kura"):
-                        path = x.split(" ")[1]
-                        if os.path.isfile(path):
-                            print(chalk.green.bold("Line " + str(iLine) + ": ") + "Detected compile source: " + path)
-                            pr = subprocess.Popen("py kurakura.py " + path, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                            out, err = pr.communicate()
-                            pr.wait()
-                            print(chalk.green.bold("Line " + str(iLine) + ": ") + "Compiled " + path + " + included (recursive)!")
-                        endedCompilation = True
-                if not endedCompilation:
-                    print(chalk.bold.red("Script doesn't contain any compilation commands. Exiting!"))
+                halo = Halo(text='Remaking project...', spinner='dots')
+                halo._text = "Copying myself..."
+                shutil.copyfile('kurakura.py', path + '/kurakura.py')
+                halo._text = "Copying default.cfg..."
+                shutil.copyfile('default.cfg', path + '/default.cfg')
+                halo._text = "Copying uncrustify..."
+                shutil.copyfile('beautify.exe', path + '/beautify.exe')
+                halo.succeed("Done!")
+            elif sys.argv[1] == "script":
+                print(chalk.bold.green("KuraScript v1.0.0"))
+                inferredScriptPath = sys.argv[2] if len(sys.argv) > 2 else None
+                if not inferredScriptPath or not os.path.exists(inferredScriptPath):
+                    print(chalk.bold.yellow("Script doesn't exist. Inferring..."))
+                    inferredScriptPath = "compile.kura"
+                    if not os.path.exists(inferredScriptPath):
+                        print(chalk.bold.red("Script doesn't exist. Exiting!"))
+                        sys.exit(1)
+                    iLine = 0
+                    compiled = False
+                    endedCompilation = False
+                    for x in open(inferredScriptPath, "r").read().split("\n"):
+                        iLine += 1
+                        if x.startswith("Compile-Kura"):
+                            path = x.split(" ")[1]
+                            if os.path.isfile(path):
+                                print(chalk.green.bold("Line " + str(iLine) + ": ") + "Detected compile source: " + path)
+                                pr = subprocess.Popen("py kurakura.py " + path, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                out, err = pr.communicate()
+                                pr.wait()
+                                print(chalk.green.bold("Line " + str(iLine) + ": ") + "Compiled " + path + " + included (recursive)!")
+                            endedCompilation = True
+                    if not endedCompilation:
+                        print(chalk.bold.red("Script doesn't contain any compilation commands. Exiting!"))
+                        sys.exit(1)
+            elif sys.argv[1] == "new":
+                path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
+                if os.path.exists(path):
+                    print(chalk.bold.red("Project already exists. Exiting!"))
                     sys.exit(1)
-        elif sys.argv[1] == "new":
-            path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
-            if os.path.exists(path):
-                print(chalk.bold.red("Project already exists. Exiting!"))
-                sys.exit(1)
-            os.makedirs(path)
-            os.makedirs(path + "/out")
-            os.makedirs(path + "/out/src")
-            os.makedirs(path + "/out/include")
-            open(path + "/main.py", "w").write("def main() -> int:\n\treturn 0\n")
-            open(path + "/default.cfg", "w").write(io.open("default.cfg", mode="r", encoding="utf-8").read())
-            open(path + "/beautify.exe", "wb").write(io.open("beautify.exe", mode="rb").read())
-            io.open(path + "/kurakura.py", mode="w", encoding="utf-8").write(io.open("kurakura.py", mode="r", encoding="utf-8").read())
-        elif sys.argv[1] == "deinit":
-            if detect_project('.'):
-                print(chalk.bold.green("Detected project!"))
-            else:
-                print(chalk.bold.red("Could not detect project. Exiting!"))
-                sys.exit(1)
-            print(chalk.bold.red("Are you sure you want to deinitialize this project?"))
-            print(chalk.bold.red("This action cannot be undone!"))
-            print(chalk.bold.red("Type 'yes' to confirm."))
-            if input("> ") == "yes":
-                if os.path.isfile('plugins.json'):
-                    os.remove('plugins.json')
-                if os.path.exists('plugins'):
-                    shutil.rmtree('plugins')
+                os.makedirs(path)
+                os.makedirs(path + "/out")
+                os.makedirs(path + "/out/src")
+                os.makedirs(path + "/out/include")
+                open(path + "/main.py", "w").write("def main() -> int:\n\treturn 0\n")
+                open(path + "/default.cfg", "w").write(io.open("default.cfg", mode="r", encoding="utf-8").read())
+                open(path + "/beautify.exe", "wb").write(io.open("beautify.exe", mode="rb").read())
+                io.open(path + "/kurakura.py", mode="w", encoding="utf-8").write(io.open("kurakura.py", mode="r", encoding="utf-8").read())
+            elif sys.argv[1] == "deinit":
+                if detect_project('.'):
+                    print(chalk.bold.green("Detected project!"))
+                else:
+                    print(chalk.bold.red("Could not detect project. Exiting!"))
+                    sys.exit(1)
+                print(chalk.bold.red("Are you sure you want to deinitialize this project?"))
+                print(chalk.bold.red("This action cannot be undone!"))
+                print(chalk.bold.red("Type 'yes' to confirm."))
+                if input("> ") == "yes":
+                    if os.path.isfile('plugins.json'):
+                        os.remove('plugins.json')
+                    if os.path.exists('plugins'):
+                        shutil.rmtree('plugins')
+                    if os.path.exists('out'):
+                        shutil.rmtree('out')
+                    if os.path.exists('pkg.zip'):
+                        os.remove('pkg.zip')
+                    if os.path.exists('kurakura.compiled.py'):
+                        os.remove('kurakura.compiled.py')
+                    os.remove('default.cfg')
+                    os.remove('beautify.exe')
+                    for root, dirs, files in os.walk('.'):
+                        for file in files:
+                            if file.endswith('.py') and file != 'kurakura.py':
+                                os.remove(os.path.join(root, file))
+                    print(chalk.bold.green("Deinitialized project!"))
+                else:
+                    print(chalk.bold.green("Cancelled!"))
+            elif sys.argv[1] == "clean":
+                path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
+                if os.path.exists(path) and detect_project(path):
+                    print(chalk.green.bold("Folder exists!"))
+                else:
+                    print(chalk.red.bold("Folder does not exist. Exiting!"))
+                    sys.exit(1)
+                if os.path.exists(path + "/out"):
+                    shutil.rmtree(path + "/out")
+                    print(chalk.bold.green("Cleaned output folder!"))
+                if os.path.exists(path + "/pkg.zip"):
+                    os.remove(path + "/pkg.zip")
+                    print(chalk.bold.green("Cleaned package!"))
+                print(chalk.bold.green("All done!"))
+            #elif sys.argv[1] == "toolchain":
+            #    print(chalk.bold.green("Minifying toolchain..."))
+            #    text = io.open("kurakura.py", mode="r", encoding="utf-8").read()
+            #    min = python_minifier.minify(text)
+            #    io.open("dist/kurakura.py", mode="w", encoding="utf-8").write(min)
+            #    print(chalk.bold.green("Minified toolchain!"))
+            #    print(chalk.bold.green("Copying to main directory..."))
+            #    shutil.copyfile('dist/kurakura.py', 'kurakura.compiled.py')
+            #    print(chalk.bold.green("Copied to main directory!"))
+            #    print(chalk.bold.green("Cleaning up..."))
+            #    shutil.rmtree('dist')
+            #    print(chalk.bold.blue("You may now distribute the optimized toolchain."))
+            #    print(chalk.bold.green("All done!"))
+            elif sys.argv[1] == "del":
+                if sys.argv[2] == ".":
+                    print(chalk.red.bold("Cannot delete current directory. Exiting!"))
+                    sys.exit(1)
+                path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
+                if os.path.exists(path) and detect_project(path):
+                    print(chalk.green.bold("Folder exists!"))
+                else:
+                    print(chalk.red.bold("Folder does not exist. Exiting!"))
+                    sys.exit(1)
+                print(chalk.bold.red("Are you sure you want to delete " + path + "?"))
+                print(chalk.bold.red("This action cannot be undone!"))
+                print(chalk.bold.red("Type 'yes' to confirm."))
+                if input("> ") == "yes":
+                    shutil.rmtree(path)
+                    print(chalk.bold.green("Deleted " + path + "!"))
+                else:
+                    print(chalk.bold.green("Cancelled!"))
+            elif sys.argv[1] == "plugin":
+                if sys.argv[2] == "install":
+                    plugin = sys.argv[3] if len(sys.argv) > 3 else input("Enter plugin name: ")
+                    if os.path.exists("plugins/" + plugin):
+                        print(chalk.green.bold("Plugin exists!"))
+                    else:
+                        print(chalk.red.bold("Plugin does not exist. Exiting!"))
+                        sys.exit(1)
+                    print(chalk.bold.green("Installing plugin..."))
+                    if not os.path.isfile("plugins.json"):
+                        open("plugins.json", "w").write("{}")
+                    plugins = json.loads(open("plugins.json", "r").read())
+                    plugins[plugin] = "1.0.0"
+                    open("plugins.json", "w").write(json.dumps(plugins))
+                    print(chalk.bold.green("Installed plugin!"))
+                elif sys.argv[2] == "remove":
+                    plugin = sys.argv[3] if len(sys.argv) > 3 else input("Enter plugin name: ")
+                    if os.path.exists("plugins/" + plugin):
+                        print(chalk.green.bold("Plugin exists!"))
+                    else:
+                        print(chalk.red.bold("Plugin does not exist. Exiting!"))
+                        sys.exit(1)
+                    print(chalk.bold.green("Uninstalling plugin..."))
+                    if not os.path.isfile("plugins.json"):
+                        open("plugins.json", "w").write("{}")
+                    plugins = json.loads(open("plugins.json", "r").read())
+                    del plugins[plugin]
+                    open("plugins.json", "w").write(json.dumps(plugins))
+                    print(chalk.bold.green("Uninstalled plugin!"))
+            elif sys.argv[1] == "pkg":
+                path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
+                if os.path.exists(path) and detect_project(path):
+                    print(chalk.green.bold("Folder exists!"))
+                else:
+                    print(chalk.red.bold("Folder does not exist. Exiting!"))
+                    sys.exit(1)
+                if os.path.exists(path + "/out"):
+                    shutil.rmtree(path + "/out")
+                if not os.path.isfile(path + "/main.py"):
+                    print(chalk.red.bold("main.py does not exist. Exiting!"))
+                    sys.exit(1)
+                os.chdir(path)
+                print(chalk.bold.green("Starting compiler on " + path + "..."))
+                p = subprocess.Popen('py kurakura.py main.py', shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                (output, err) = p.communicate()  
+                p_status = p.wait()
+                print(chalk.bold.green("Compiling complete!"))
+                halo = Halo(text='Compressing...', spinner='dots8', animation='marquee', force=True)
+                halo.start()
+                zipf = zipfile.ZipFile(path + '/pkg' + '.zip', 'w', zipfile.ZIP_DEFLATED)
+                for root, dirs, files in os.walk(path + '/out'):
+                    for file in files:
+                        if not file.endswith('.zip'):
+                            zipf.write(os.path.join(root, file))
+                zipf.close()
+                halo.succeed(text='Compressed!')
+                print(chalk.bold.green("All done!"))
+            elif sys.argv[1].endswith(".py"):
+                if detect_project('.'):
+                    print(chalk.bold.green("Detected project!"))
+                else:
+                    print(chalk.bold.red("Could not detect project. Exiting!"))
+                    sys.exit(1)
+                if not sys.argv[1].endswith(".py"):
+                    print(chalk.bold.red("Input file is not a .py file. Exiting!"))
+                    sys.exit(1)
                 if os.path.exists('out'):
                     shutil.rmtree('out')
-                if os.path.exists('pkg.zip'):
-                    os.remove('pkg.zip')
-                if os.path.exists('kurakura.compiled.py'):
-                    os.remove('kurakura.compiled.py')
-                os.remove('default.cfg')
-                os.remove('beautify.exe')
-                for root, dirs, files in os.walk('.'):
-                    for file in files:
-                        if file.endswith('.py') and file != 'kurakura.py':
-                            os.remove(os.path.join(root, file))
-                print(chalk.bold.green("Deinitialized project!"))
+                if not os.path.isfile(sys.argv[1]):
+                    print(chalk.bold.red("Input file does not exist. Exiting!"))
+                    sys.exit(1)
+                if not os.path.basename(sys.argv[1]) == 'main.py':
+                    print(chalk.bold.yellow("Why is the input file not named main.py? We'll just build it anyway."))
+                print(chalk.bold.green("Starting operations on " + sys.argv[1] + "..."))
+                print(chalk.bold.green("- Compiling " + sys.argv[1] + "..."))
+                parse(sys.argv[1], "")
+                print(chalk.bold.magentaBright("Done!") + " Output is in " + chalk.bold.blue("out/"))
+                success = True
             else:
-                print(chalk.bold.green("Cancelled!"))
-        elif sys.argv[1] == "clean":
-            path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
-            if os.path.exists(path) and detect_project(path):
-                print(chalk.green.bold("Folder exists!"))
+                print(chalk.bold.red("Unknown command. Exiting!"))
+                sys.exit(1)
+        else:
+            print(chalk.bold.red("No input files. Will attempt to infer from current directory."))
+            if os.path.isfile('main.py'):
+                print(chalk.bold.green("Detected main.py!"))
+                if os.path.exists('out'):
+                    shutil.rmtree('out')
+                print(chalk.bold.green("- Compiling main.py..."))
+                parse('main.py', "")
+                print(chalk.bold.magentaBright("Done!") + " Output is in " + chalk.bold.blue("out/"))
+                success = True
             else:
-                print(chalk.red.bold("Folder does not exist. Exiting!"))
+                print(chalk.bold.red("Could not find main.py! Exiting!"))
                 sys.exit(1)
-            if os.path.exists(path + "/out"):
-                shutil.rmtree(path + "/out")
-                print(chalk.bold.green("Cleaned output folder!"))
-            if os.path.exists(path + "/pkg.zip"):
-                os.remove(path + "/pkg.zip")
-                print(chalk.bold.green("Cleaned package!"))
-            print(chalk.bold.green("All done!"))
-        elif sys.argv[1] == "del":
-            if sys.argv[2] == ".":
-                print(chalk.red.bold("Cannot delete current directory. Exiting!"))
-                sys.exit(1)
-            path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
-            if os.path.exists(path) and detect_project(path):
-                print(chalk.green.bold("Folder exists!"))
-            else:
-                print(chalk.red.bold("Folder does not exist. Exiting!"))
-                sys.exit(1)
-            print(chalk.bold.red("Are you sure you want to delete " + path + "?"))
-            print(chalk.bold.red("This action cannot be undone!"))
-            print(chalk.bold.red("Type 'yes' to confirm."))
-            if input("> ") == "yes":
-                shutil.rmtree(path)
-                print(chalk.bold.green("Deleted " + path + "!"))
-            else:
-                print(chalk.bold.green("Cancelled!"))
-        elif sys.argv[1] == "plugin_add":
-            plugin = sys.argv[2] if len(sys.argv) > 2 else input("Enter plugin name: ")
-            if os.path.exists("plugins/" + plugin):
-                print(chalk.green.bold("Plugin exists!"))
-            else:
-                print(chalk.red.bold("Plugin does not exist. Exiting!"))
-                sys.exit(1)
-            print(chalk.bold.green("Installing plugin..."))
-            if not os.path.isfile("plugins.json"):
-                open("plugins.json", "w").write("{}")
-            plugins = json.loads(open("plugins.json", "r").read())
-            plugins[plugin] = "1.0.0"
-            open("plugins.json", "w").write(json.dumps(plugins))
-            print(chalk.bold.green("Installed plugin!"))
-        elif sys.argv[1] == "plugin_remove":
-            plugin = sys.argv[2] if len(sys.argv) > 2 else input("Enter plugin name: ")
-            if os.path.exists("plugins/" + plugin):
-                print(chalk.green.bold("Plugin exists!"))
-            else:
-                print(chalk.red.bold("Plugin does not exist. Exiting!"))
-                sys.exit(1)
-            print(chalk.bold.green("Uninstalling plugin..."))
-            if not os.path.isfile("plugins.json"):
-                open("plugins.json", "w").write("{}")
-            plugins = json.loads(open("plugins.json", "r").read())
-            del plugins[plugin]
-            open("plugins.json", "w").write(json.dumps(plugins))
-            print(chalk.bold.green("Uninstalled plugin!"))
-        elif sys.argv[1] == "pkg":
-            path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
-            if os.path.exists(path) and detect_project(path):
-                print(chalk.green.bold("Folder exists!"))
-            else:
-                print(chalk.red.bold("Folder does not exist. Exiting!"))
-                sys.exit(1)
-            if os.path.exists(path + "/out"):
-                shutil.rmtree(path + "/out")
-            if not os.path.isfile(path + "/main.py"):
-                print(chalk.red.bold("main.py does not exist. Exiting!"))
-                sys.exit(1)
-            os.chdir(path)
-            print(chalk.bold.green("Starting compiler on " + path + "..."))
-            p = subprocess.Popen('py kurakura.py main.py', shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-            (output, err) = p.communicate()  
-            p_status = p.wait()
-            print(chalk.bold.green("Compiling complete!"))
-            halo = Halo(text='Compressing...', spinner='dots8', animation='marquee', force=True)
-            halo.start()
-            zipf = zipfile.ZipFile(path + '/pkg' + '.zip', 'w', zipfile.ZIP_DEFLATED)
-            for root, dirs, files in os.walk(path + '/out'):
+        if success == True:
+            print(chalk.bold.green("Beautifying..."))
+            for root, dirs, files in os.walk('out/src'):
                 for file in files:
-                    if not file.endswith('.zip'):
-                        zipf.write(os.path.join(root, file))
-            zipf.close()
-            halo.succeed(text='Compressed!')
+                    if file.endswith('.cpp'):
+                        print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
+                        p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                        (output, err) = p.communicate()
+                        p_status = p.wait()
+                        print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
+                        if len(output.strip()) > 0:
+                            print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
+                        elif len(err.strip()) > 0:
+                            print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
+            for root, dirs, files in os.walk('out/include'):
+                for file in files:
+                    if file.endswith('.h'):
+                        print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
+                        p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                        (output, err) = p.communicate()
+                        p_status = p.wait()
+                        print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
+                        if len(output.strip()) > 0:
+                            print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
+                        elif len(err.strip()) > 0:
+                            print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
+            for root, dirs, files in os.walk('out/src'):
+                for file in files:
+                    if file.endswith('~'):
+                        os.remove(os.path.join(root, file))
+            for root, dirs, files in os.walk('out/include'):
+                for file in files:
+                    if file.endswith('~'):
+                        os.remove(os.path.join(root, file))
+            print(chalk.bold.magentaBright("Done!"))
             print(chalk.bold.green("All done!"))
-        elif sys.argv[1].endswith(".py"):
-            if detect_project('.'):
-                print(chalk.bold.green("Detected project!"))
-            else:
-                print(chalk.bold.red("Could not detect project. Exiting!"))
-                sys.exit(1)
-            if not sys.argv[1].endswith(".py"):
-                print(chalk.bold.red("Input file is not a .py file. Exiting!"))
-                sys.exit(1)
-            if os.path.exists('out'):
-                shutil.rmtree('out')
-            if not os.path.isfile(sys.argv[1]):
-                print(chalk.bold.red("Input file does not exist. Exiting!"))
-                sys.exit(1)
-            if not os.path.basename(sys.argv[1]) == 'main.py':
-                print(chalk.bold.yellow("Why is the input file not named main.py? We'll just build it anyway."))
-            print(chalk.bold.green("Starting operations on " + sys.argv[1] + "..."))
-            print(chalk.bold.green("- Compiling " + sys.argv[1] + "..."))
-            parse(sys.argv[1], "")
-            print(chalk.bold.magentaBright("Done!") + " Output is in " + chalk.bold.blue("out/"))
-            success = True
-        else:
-            print(chalk.bold.red("Unknown command. Exiting!"))
-            sys.exit(1)
-    else:
-        print(chalk.bold.red("No input files. Will attempt to infer from current directory."))
-        if os.path.isfile('main.py'):
-            print(chalk.bold.green("Detected main.py!"))
-            if os.path.exists('out'):
-                shutil.rmtree('out')
-            print(chalk.bold.green("- Compiling main.py..."))
-            parse('main.py', "")
-            print(chalk.bold.magentaBright("Done!") + " Output is in " + chalk.bold.blue("out/"))
-            success = True
-        else:
-            print(chalk.bold.red("Could not find main.py! Exiting!"))
-            sys.exit(1)
-    if success == True:
-        print(chalk.bold.green("Beautifying..."))
-        for root, dirs, files in os.walk('out/src'):
-            for file in files:
-                if file.endswith('.cpp'):
-                    print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
-                    p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-                    (output, err) = p.communicate()
-                    p_status = p.wait()
-                    print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
-                    if len(output.strip()) > 0:
-                        print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
-                    elif len(err.strip()) > 0:
-                        print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
-        for root, dirs, files in os.walk('out/include'):
-            for file in files:
-                if file.endswith('.h'):
-                    print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
-                    p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-                    (output, err) = p.communicate()
-                    p_status = p.wait()
-                    print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
-                    if len(output.strip()) > 0:
-                        print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
-                    elif len(err.strip()) > 0:
-                        print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
-        for root, dirs, files in os.walk('out/src'):
-            for file in files:
-                if file.endswith('~'):
-                    os.remove(os.path.join(root, file))
-        for root, dirs, files in os.walk('out/include'):
-            for file in files:
-                if file.endswith('~'):
-                    os.remove(os.path.join(root, file))
-        print(chalk.bold.magentaBright("Done!"))
-        print(chalk.bold.green("All done!"))
-        newTotalTime = time.time()
-        print(chalk.bold.green("Total time taken: ") + chalk.bold.magenta(str(round(newTotalTime - oldTotalTime, 2))) + " seconds.")
+            newTotalTime = time.time()
+            print(chalk.bold.green("Total time taken: ") + chalk.bold.magenta(str(round(newTotalTime - oldTotalTime, 2))) + " seconds.")
