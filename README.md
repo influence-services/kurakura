@@ -151,6 +151,12 @@ Project paths are allowed to be "." for the current directory except for ```del`
 - **Bootstrap** a new project and copy the toolchain and utilities: ```py kurakura.py new projectPath```
 - **Rehydrate** a project with the toolchain and utilities: ```py kurakura.py remake projectPath```
 
+## Commands (plugin management)
+You must have a project in your current directory to use these commands.   
+To add or remove a plugin, it will have to be in the ```plugins/``` folder.
+- **Add** a plugin: ```py kurakura.py plugin install myplugin.py```
+- **Remove** a plugin: ```py kurakura.py plugin remove myplugin.py```
+
 ## Reporting bugs
 - Please go to the issues or [DM me](https://discordapp.com/users/1021090674289942600) tab in order to report a bug.
 - To fix a bug (most preferred), please create a pull request.
