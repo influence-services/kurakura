@@ -1,6 +1,5 @@
 out/
 bundled/
-test/
 dist/
 default.cfg
 beautify.exe
@@ -9,4 +8,3 @@ myproject/
 gcc/
 gcc.zip
 plugins.json
-plugins/
