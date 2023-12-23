@@ -1,6 +1,9 @@
 // This is an example of an "autonlang" script.
 // It does not perform any important actions, and this is not an actual auton.
 
+// The framework we are using is VEX PROS
+framework pros
+
 // Rotate left for 1 second
 groups
   time 1s
