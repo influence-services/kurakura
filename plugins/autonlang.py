@@ -132,7 +132,7 @@ def TransformIntoCalls(parsed):
     global rout
     soup = BeautifulSoup(parsed, "html.parser")
     instructions = []
-    for tag in soup.find_all():
+    for tag in soup.contents:
         if tag.name == "def":
             _routine(tag, instructions)
         if tag.name == "pneumatics":
