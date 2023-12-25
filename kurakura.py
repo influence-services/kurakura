@@ -27,7 +27,7 @@ num_processes = kernel32.GetConsoleProcessList(process_array, 1)
 
 if num_processes == 3:
     is_console = True
-else:
+elif num_processes == 2:
     is_console = False
 
 log_hooks = []
@@ -1023,8 +1023,6 @@ def TransformExpr(node: ast.Expr):
                 header += "#define " + node.value.args[0].value + "\n"
             elif s.startswith("header_define"):
                 header += "#define " + node.value.args[0].value + " " + node.value.args[1].value + "\n"
-            elif s.startswith("header_ifndef"):
-                header += "#ifndef " + node.value.args[0].value + "\n"
             elif s.startswith("header_include"):
                 header += "#include \"" + node.value.args[0].value + "\"\n"
             elif s.startswith("namespaces"):
@@ -1045,8 +1043,6 @@ def TransformExpr(node: ast.Expr):
                 header += "#define " + node.value.args[0].value + "\n"
             elif name.startswith("header_define"):
                 header += "#define " + node.value.args[0].value + " " + node.value.args[1].value + "\n"
-            elif name.startswith("header_ifndef"):
-                header += "#ifndef " + node.value.args[0].value + "\n"
             elif name.startswith("header_include"):
                 header += "#include \"" + node.value.args[0].value + "\"\n"
             elif name.startswith("namespaces"):
@@ -1380,19 +1376,6 @@ if __name__ == "__main__":
                     os.remove(path + "/pkg.zip")
                     print(chalk.bold.green("Cleaned package!"))
                 print(chalk.bold.green("All done!"))
-            #elif sys.argv[1] == "toolchain":
-            #    print(chalk.bold.green("Minifying toolchain..."))
-            #    text = io.open("kurakura.py", mode="r", encoding="utf-8").read()
-            #    min = python_minifier.minify(text)
-            #    io.open("dist/kurakura.py", mode="w", encoding="utf-8").write(min)
-            #    print(chalk.bold.green("Minified toolchain!"))
-            #    print(chalk.bold.green("Copying to main directory..."))
-            #    shutil.copyfile('dist/kurakura.py', 'kurakura.compiled.py')
-            #    print(chalk.bold.green("Copied to main directory!"))
-            #    print(chalk.bold.green("Cleaning up..."))
-            #    shutil.rmtree('dist')
-            #    print(chalk.bold.blue("You may now distribute the optimized toolchain."))
-            #    print(chalk.bold.green("All done!"))
             elif sys.argv[1] == "del":
                 if sys.argv[2] == ".":
                     print(chalk.red.bold("Cannot delete current directory. Exiting!"))
