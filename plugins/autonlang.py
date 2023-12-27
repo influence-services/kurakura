@@ -5,7 +5,7 @@ import re
 import math
 
 def TransformTimeToMS(time):
-    matched = re.match(r"([0-9]+)([a-z])", time)
+    matched = re.match(r"([0-9.]+)([a-z]+)", time)
     time = int(matched.group(1))
     unit = matched.group(2)
     if unit == "s":
@@ -165,7 +165,7 @@ def TransformJade(node, content):
                             'content' : TransformIntoCalls(parsed),
                             'header'  : ""
                         }
-    return True
+    return False
 
 Transformers = [
     TransformJade
