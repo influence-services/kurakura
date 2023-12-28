@@ -1,0 +1,16 @@
+drive
+    left
+        front front_left
+        back back_left
+    right
+        front front_right
+        back back_right
+    type single
+
+on
+    button R1
+    single
+
+    pneumatics
+        port 2
+        state on
