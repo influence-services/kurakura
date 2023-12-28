@@ -91,7 +91,13 @@ def TransformIntoCalls(parsed):
     instructions = ["while (true) {"]
     for tag1 in soup.contents:
         if tag1.name == "on":
-            instructions.append("if (controller_get_digital_new_press(E_CONTROLLER_MASTER, " + maps[tag1.find("button").text] + ")) {")
+            isSingle = False
+            if tag1.find("single"):
+                isSingle = True
+            if isSingle:
+                instructions.append("if (controller_get_digital_new_press(E_CONTROLLER_MASTER, " + maps[tag1.find("button").text] + ")) {")
+            else:
+                instructions.append("if (controller_get_digital(E_CONTROLLER_MASTER, " + maps[tag1.find("button").text] + ")) {")
             for tag in tag1.children:
                 if tag.name == "pneumatics":
                     _pneumatics(tag, instructions)
