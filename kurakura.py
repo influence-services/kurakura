@@ -1614,4 +1614,55 @@ if __name__ == "__main__":
                 print(chalk.bold.red("Unknown command. Exiting!"))
                 sys.exit(1)
         else:
+            print(chalk.bold.red("No input files. Will attempt to infer from current directory."))
+            if os.path.isfile('main.py'):
+                print(chalk.bold.green("Detected main.py!"))
+                if os.path.exists('out'):
+                    shutil.rmtree('out')
+                print(chalk.bold.green("- Compiling main.py..."))
+                parse('main.py', "")
+                print(chalk.bold.magentaBright("Done!") + " Output is in " + chalk.bold.blue("out/"))
+                success = True
+            else:
+                print(chalk.bold.red("Could not find main.py! Exiting!"))
+                sys.exit(1)
+        if success == True:
+            print(chalk.bold.green("Beautifying..."))
+            for root, dirs, files in os.walk('out/src'):
+                for file in files:
+                    if file.endswith('.cpp'):
+                        print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
+                        p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                        (output, err) = p.communicate()
+                        p_status = p.wait()
+                        print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
+                        if len(output.strip()) > 0:
+                            print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
+                        elif len(err.strip()) > 0:
+                            print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
+            for root, dirs, files in os.walk('out/include'):
+                for file in files:
+                    if file.endswith('.h'):
+                        print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
+                        p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                        (output, err) = p.communicate()
+                        p_status = p.wait()
+                        print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
+                        if len(output.strip()) > 0:
+                            print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
+                        elif len(err.strip()) > 0:
+                            print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
+            for root, dirs, files in os.walk('out/src'):
+                for file in files:
+                    if file.endswith('~'):
+                        os.remove(os.path.join(root, file))
+            for root, dirs, files in os.walk('out/include'):
+                for file in files:
+                    if file.endswith('~'):
+                        os.remove(os.path.join(root, file))
+            print(chalk.bold.magentaBright("Done!"))
+            print(chalk.bold.green("All done!"))
+            newTotalTime = time.time()
+            print(chalk.bold.green("Total time taken: ") + chalk.bold.magenta(str(round(newTotalTime - oldTotalTime, 2))) + " seconds.")
+
             happyCompilationCommand()

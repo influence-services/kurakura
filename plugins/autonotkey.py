@@ -4,30 +4,12 @@ from bs4 import BeautifulSoup
 import re
 import math
 
-def TransformTimeToMS(time):
-    matched = re.match(r"([0-9.]+)([a-z]+)", time)
-    time = int(matched.group(1))
-    unit = matched.group(2)
-    if unit == "s":
-        return "pros::delay(" + str(time * 1000) + ");"
-    elif unit == "m":
-        return "pros::delay(" + str(time * 1000 * 60) + ");"
-    elif unit == "ms":
-        return "pros::delay(" + str(time) + ");"
-    return "pros::delay(" + str(time * 1000) + ");"
 
 rout = {}
 
 def _pneumatics(tag, instructions, dontAppend = False):
-    port = int(tag.find("port").text)
-    call_rout = tag.find("call")
     _local_instructions = []
-    if call_rout:
-        routine = rout[call_rout.text]
-        if not dontAppend:
-            instructions.extend(routine)
-        else:
-            _local_instructions.extend(routine)
+    port = int(tag.find("port").text)
     if tag.find("state").text == "on":
         if not dontAppend:
             instructions.append("digitalWrite(" + str(port) + ", HIGH);")
@@ -42,16 +24,8 @@ def _pneumatics(tag, instructions, dontAppend = False):
         return _local_instructions
 
 def _groups(tag, instructions, routines, dontAppend = False):
-    time = TransformTimeToMS(tag.find("time").text)
     groups = tag.find_all("group")
-    call_rout = tag.find("call")
     _local_instructions = []
-    if call_rout:
-        routine = routines[call_rout.text]
-        if not dontAppend:
-            instructions.extend(routine)
-        else:
-            _local_instructions.extend(routine)
     if not tag.find("rotate") and not tag.find("move"):
         for x in range(len(groups)):
             dir = groups[x].find("dir").text
@@ -63,12 +37,6 @@ def _groups(tag, instructions, routines, dontAppend = False):
                 instructions.append(groups[x].find("name").text + ".move(" + str(flipped) + ");")
             else:
                 _local_instructions.append(groups[x].find("name").text + ".move(" + str(flipped) + ");")
-        instructions.append(time)
-        for x in range(len(groups)):
-            if not dontAppend:
-                instructions.append(groups[x].find("name").text + ".move(0);")
-            else:
-                _local_instructions.append(groups[x].find("name").text + ".move(0);")
     elif tag.find("move"):
         dir = tag.find("move").text
         percent = 127 * (math.floor(int(tag.find("speed").text[:-1])) / 100)
@@ -80,15 +48,6 @@ def _groups(tag, instructions, routines, dontAppend = False):
                 instructions.append(groups[x].find("name").text + ".move(" + str(flipped) + ");")
             else:
                 _local_instructions.append(groups[x].find("name").text + ".move(" + str(flipped) + ");")
-        if not dontAppend:
-            instructions.append(time)
-        else:
-            _local_instructions.append(time)
-        for x in range(len(groups)):
-            if not dontAppend:
-                instructions.append(groups[x].find("name").text + ".move(0);")
-            else:
-                _local_instructions.append(groups[x].find("name").text + ".move(0);")
     else:
         left = groups[0]
         right = groups[1]
@@ -108,37 +67,68 @@ def _groups(tag, instructions, routines, dontAppend = False):
             else:
                 _local_instructions.append(left.find("name").text + ".move(" + str(percent) + ");")
                 _local_instructions.append(right.find("name").text + ".move(" + str(-percent) + ");")
-        if not dontAppend:
-            instructions.append(time)
-            instructions.append(left.find("name").text + ".move(0);")
-            instructions.append(right.find("name").text + ".move(0);")
-        else:
-            _local_instructions.append(time)
-            _local_instructions.append(left.find("name").text + ".move(0);")
-            _local_instructions.append(right.find("name").text + ".move(0);")
     if dontAppend:
         return _local_instructions
 
-def _routine(tag, instructions):
-    name = tag.find("name").text
-    rout[name] = []
-    for child in tag.children:
-        if child.name == "pneumatics":
-            rout[name].extend(_pneumatics(child, rout[name], True))
-        elif child.name == "groups":
-            rout[name].extend(_groups(child, rout[name], rout, True))
+maps = {
+    "R1": "E_CONTROLLER_DIGITAL_R1",
+    "R2": "E_CONTROLLER_DIGITAL_R2",
+    "L1": "E_CONTROLLER_DIGITAL_L1",
+    "L2": "E_CONTROLLER_DIGITAL_L2",
+    "up": "E_CONTROLLER_DIGITAL_UP",
+    "down": "E_CONTROLLER_DIGITAL_DOWN",
+    "left": "E_CONTROLLER_DIGITAL_LEFT",
+    "right": "E_CONTROLLER_DIGITAL_RIGHT",
+    "A": "E_CONTROLLER_DIGITAL_A",
+    "B": "E_CONTROLLER_DIGITAL_B",
+    "X": "E_CONTROLLER_DIGITAL_X",
+    "Y": "E_CONTROLLER_DIGITAL_Y"
+}
 
 def TransformIntoCalls(parsed):
     global rout
     soup = BeautifulSoup(parsed, "html.parser")
-    instructions = []
-    for tag in soup.contents:
-        if tag.name == "def":
-            _routine(tag, instructions)
-        if tag.name == "pneumatics":
-            _pneumatics(tag, instructions)
-        elif tag.name == "groups":
-            _groups(tag, instructions, rout)
+    instructions = ["while (true) {"]
+    for tag1 in soup.contents:
+        if tag1.name == "on":
+            isSingle = False
+            if tag1.find("single"):
+                isSingle = True
+            if isSingle:
+                instructions.append("if (controller_get_digital_new_press(E_CONTROLLER_MASTER, " + maps[tag1.find("button").text] + ")) {")
+            else:
+                instructions.append("if (controller_get_digital(E_CONTROLLER_MASTER, " + maps[tag1.find("button").text] + ")) {")
+            for tag in tag1.children:
+                if tag.name == "pneumatics":
+                    _pneumatics(tag, instructions)
+                elif tag.name == "groups":
+                    _groups(tag, instructions, rout)
+            instructions.append("}")
+        elif tag1.name == "drive":
+            leftGroup = tag1.find("left")
+            rightGroup = tag1.find("right")
+            driveType = tag1.find("type").text
+            instructions.append("int left = controller_get_analog(E_CONTROLLER_MASTER, E_CONTROLLER_ANALOG_LEFT_Y);")
+            instructions.append("int right = controller_get_analog(E_CONTROLLER_MASTER, E_CONTROLLER_ANALOG_RIGHT_Y);")
+            instructions.append("int singleX = controller_get_analog(E_CONTROLLER_MASTER, E_CONTROLLER_ANALOG_LEFT_X);")
+            instructions.append("int singleY = controller_get_analog(E_CONTROLLER_MASTER, E_CONTROLLER_ANALOG_LEFT_Y);")
+            names = {
+                "frontLeft": leftGroup.find("front").text,
+                "backLeft": leftGroup.find("back").text,
+                "frontRight": rightGroup.find("front").text,
+                "backRight": rightGroup.find("back").text
+            }
+            if driveType == "double" or driveType == "tank":
+                instructions.append(names["frontLeft"] + ".move(left);")
+                instructions.append(names["backLeft"] + ".move(left);")
+                instructions.append(names["frontRight"] + ".move(right);")
+                instructions.append(names["backRight"] + ".move(right);")
+            elif driveType == "single":
+                instructions.append(names["frontLeft"] + ".move(singleY + singleX);")
+                instructions.append(names["backLeft"] + ".move(singleY + singleX);")
+                instructions.append(names["frontRight"] + ".move(singleY - singleX);")
+                instructions.append(names["backRight"] + ".move(singleY - singleX);")
+    instructions.extend(["pros::delay(20);", "}"])
     return "\n".join(instructions)
 
 
@@ -149,16 +139,16 @@ def TransformJade(node, content):
         if type(node.value) == ast.Call:
             parser = Parser()
             if type(node.value.func) == ast.Attribute:
-                if node.value.func.attr == "include_auton":
-                    if node.value.args[0].s.endswith(".aula"):
+                if node.value.func.attr == "include_notkey":
+                    if node.value.args[0].s.endswith(".nkey"):
                         with open(node.value.args[0].s, "r", encoding="utf-8") as f:
                             parsed = parser.parse(f.read())
                             return {
                                 'content' : TransformIntoCalls(parsed),
                                 'header'  : ""
                             }
-            elif node.value.func.id == "include_auton":
-                if node.value.args[0].s.endswith(".aula"):
+            elif node.value.func.id == "include_notkey":
+                if node.value.args[0].s.endswith(".nkey"):
                     with open(node.value.args[0].s, "r", encoding="utf-8") as f:
                         parsed = parser.parse(f.read())
                         return {
