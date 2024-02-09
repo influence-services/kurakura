@@ -27,7 +27,7 @@ num_processes = kernel32.GetConsoleProcessList(process_array, 1)
 
 if num_processes == 3:
     is_console = True
-else:
+elif num_processes == 2:
     is_console = False
 
 log_hooks = []
@@ -40,23 +40,25 @@ def print(*args, **kw):
         hook(*args, **kw)
     _print(*args, **kw)
 
-if not os.path.isfile('plugins.json'):
+if not os.path.exists('assets'):
+    os.makedirs('assets')
+
+if not os.path.isfile('assets/plugins.json'):
     print(chalk.bold.red("Plugins file doesn't exist."))
-    open('plugins.json', 'w').write("{}")
+    open('assets/plugins.json', 'w').write("{}")
     print(chalk.bold.green("Created plugins file."))
 else:
     print(chalk.bold.green("Plugins file exists."))
 
-plugins = json.loads(open('plugins.json', 'r').read())
+plugins = json.loads(open('assets/plugins.json', 'r').read())
 
 code = None
 tree = None
 content = ""
-header = "#pragma once;\n"
+header = "#pragma once\n"
 inFunction = False
 
 print(chalk.bold.magenta("くらくら!"))
-print(chalk.cyanBright("Hello."))
 
 def readSpecifiedLine(file, line):
     return io.open(file, mode="r", encoding="utf-8").readlines()[line - 1]
@@ -119,7 +121,7 @@ def exceptionHook(exctype, value, traceback: types.TracebackType):
 
 sys.excepthook = exceptionHook
 
-if os.path.isfile('beautify.exe'):
+if os.path.isfile('assets/beautify.exe'):
     print(chalk.bold.green("Beautifier exists"))
 else:
     print(chalk.bold.red("Beautifier does not exist. Downloading..."))
@@ -134,17 +136,17 @@ else:
     halo.succeed(text='Extracted beautifier.')
     os.remove('uncrustify-0.78.1_f-win64.zip')
     path = "uncrustify/bin/uncrustify.exe"
-    os.rename(path, 'beautify.exe')
+    os.rename(path, 'assets/beautify.exe')
     shutil.rmtree('uncrustify')
 
-if os.path.isfile('default.cfg'):
+if os.path.isfile('assets/default.cfg'):
     print(chalk.bold.green("Default config exists"))
 else:
     print(chalk.bold.red("Default config does not exist. Downloading..."))
     halo = Halo(text='Downloading default config...', spinner='dots8', animation='marquee', force=True)
     halo.start()
     s = req.get('https://raw.githubusercontent.com/uncrustify/uncrustify/master/documentation/htdocs/default.cfg', allow_redirects=True)
-    open('default.cfg', 'wb').write(s.content)
+    open('assets/default.cfg', 'wb').write(s.content)
     halo.succeed(text='Downloaded default config.')
 
     
@@ -159,7 +161,7 @@ def parse(fileName, path):
     fileName = fileName.split('/')[-1]
 
     content = ""
-    header = ""
+    header = "#pragma once\n"
     defined_external_vars = []
     defined_global_vars = []
     var_types = {}
@@ -305,22 +307,26 @@ def TransformFunctionDefinition(node: ast.FunctionDef):
                 header += "bool " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
                 content += "bool " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ") {\n"
             elif node.returns.value == None:
-                header += "void " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
+                if len(node.args.args) == 0:
+                    header += "void " + node.name + "(void);\n"
+                else:
+                    header += "void " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
                 content += "void " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ") {\n"
         else:
-            if not node.returns:
-                print("   - " + chalk.bold.blueBright("Function ") + node.name + chalk.bold.blueBright(" returns auto..."))
-                header += "auto " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
-                content += "auto " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ") {\n"
-            else:
-                if node.returns.id == "Lie":
-                    print("   - " + chalk.bold.blueBright("Function ") + node.name + chalk.bold.blueBright(" returns auto..."))
-                    header += "void " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
-                    content += "void " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ") {\n"
+            if node.returns.id == "Lie":
+                print("   - " + chalk.bold.blueBright("Function ") + node.name + chalk.bold.blueBright(" returns void..."))
+                if len(node.args.args) == 0:
+                    header += "void " + node.name + "(void);\n"
                 else:
-                    print("   - " + chalk.bold.blueBright("Function ") + node.name + chalk.bold.blueBright(" returns ") + node.returns.id + "...")
-                    header += node.returns.id + " " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
-                    content += node.returns.id + " " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ") {\n"
+                    header += "void " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
+                content += "void " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ") {\n"
+            else:
+                print("   - " + chalk.bold.blueBright("Function ") + node.name + chalk.bold.blueBright(" returns auto..."))
+                if len(node.args.args) == 0:
+                    header += "auto " + node.name + "(void);\n"
+                else:
+                    header += "auto " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ");\n"
+                content += "auto " + node.name + "(" + transformInternalRebuildArgs(node.args.args) + ") {\n"
         for node2 in node.body:
             if type(node2) == ast.Return:
                 if type(node.returns) == ast.Constant:
@@ -1023,10 +1029,16 @@ def TransformExpr(node: ast.Expr):
                 header += "#define " + node.value.args[0].value + "\n"
             elif s.startswith("header_define"):
                 header += "#define " + node.value.args[0].value + " " + node.value.args[1].value + "\n"
-            elif s.startswith("header_ifndef"):
-                header += "#ifndef " + node.value.args[0].value + "\n"
             elif s.startswith("header_include"):
                 header += "#include \"" + node.value.args[0].value + "\"\n"
+            elif s == "pros_main":
+                header += "#ifndef _PROS_MAIN_H_\n"
+            elif s == "pros_main_end":
+                header += "#endif\n"
+            elif s == "pros_extern":
+                header += '#ifdef __cplusplus\nextern "C" {\n#endif\n'
+            elif s == "pros_extern_end":
+                header += '#ifdef __cplusplus\n}\n#endif\n'
             elif s.startswith("namespaces"):
                 content += node.value.func.id.replace("namespaces.", "").replace(".", "::") + "(" + transformInternalRebuildCallArgs(node.value.args) + ");\n"
             elif node.value.func.id == "print":
@@ -1045,10 +1057,16 @@ def TransformExpr(node: ast.Expr):
                 header += "#define " + node.value.args[0].value + "\n"
             elif name.startswith("header_define"):
                 header += "#define " + node.value.args[0].value + " " + node.value.args[1].value + "\n"
-            elif name.startswith("header_ifndef"):
-                header += "#ifndef " + node.value.args[0].value + "\n"
             elif name.startswith("header_include"):
                 header += "#include \"" + node.value.args[0].value + "\"\n"
+            elif name == "pros_main":
+                header += "#ifndef _PROS_MAIN_H_\n"
+            elif name == "pros_main_end":
+                header += "#endif\n"
+            elif name == "pros_extern":
+                header += '#ifdef __cplusplus\nextern "C" {\n#endif\n'
+            elif name == "pros_extern_end":
+                header += '#ifdef __cplusplus\n}\n#endif\n'
             elif name.startswith("namespaces"):
                 content += node.value.func.attr.replace("namespaces.", "").replace(".", "::") + "(" + transformInternalRebuildCallArgs(node.value.args) + ");\n"
             elif name.startswith("print"):
@@ -1198,7 +1216,7 @@ def Transform(node: ast.AST):
                     "content": content,
                     "header": header
                 })
-                if not val == True:
+                if not val == False:
                     content += val['content']
                     header += val['header']
                     return
@@ -1255,10 +1273,58 @@ def make_archive(source, destination):
     shutil.move('%s.%s'%(name,format), destination)
 
 def detect_project(path):
-    if os.path.exists(path + "/kurakura.py") and os.path.exists(path + "/default.cfg") and os.path.exists(path + "/beautify.exe"):
+    if os.path.exists(path + "/kurakura.py") and os.path.exists(path + "/assets/default.cfg") and os.path.exists(path + "/assets/beautify.exe"):
         return True
     else:
         return False
+
+success = False
+oldTotalTime = 0
+
+def happyCompilationCommand():
+    global success
+    print(chalk.bold.red("No input files. Will attempt to infer from current directory."))
+    if os.path.isfile('main.py'):
+        print(chalk.bold.green("Detected main.py!"))
+        if os.path.exists('out'):
+            shutil.rmtree('out')
+        print(chalk.bold.green("- Compiling main.py..."))
+        parse('main.py', "")
+        print(chalk.bold.magentaBright("Done!") + " Output is in " + chalk.bold.blue("out/"))
+        success = True
+    else:
+        print(chalk.bold.red("Could not find main.py! Exiting!"))
+        sys.exit(1)
+    if success == True:
+        print(chalk.bold.green("Beautifying..."))
+        for root, dirs, files in os.walk('out/src'):
+            for file in files:
+                if file.endswith('.cpp'):
+                    print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
+                    p = subprocess.Popen('assets\\beautify.exe -c assets/default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                    (output, err) = p.communicate()
+                    p_status = p.wait()
+                    print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
+        for root, dirs, files in os.walk('out/include'):
+            for file in files:
+                if file.endswith('.h'):
+                    print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
+                    p = subprocess.Popen('assets\\beautify.exe -c assets/default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                    (output, err) = p.communicate()
+                    p_status = p.wait()
+                    print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
+        for root, dirs, files in os.walk('out/src'):
+            for file in files:
+                if file.endswith('~'):
+                    os.remove(os.path.join(root, file))
+        for root, dirs, files in os.walk('out/include'):
+            for file in files:
+                if file.endswith('~'):
+                    os.remove(os.path.join(root, file))
+        print(chalk.bold.magentaBright("Done!"))
+        print(chalk.bold.green("All done!"))
+        newTotalTime = time.time()
+        print(chalk.bold.green("Total time taken: ") + chalk.bold.magenta(str(round(newTotalTime - oldTotalTime, 2))) + " seconds.")
 
 if __name__ == "__main__":
     if os.name == 'nt' and 'PROMPT' in os.environ or not sys.stdin.isatty() or not is_console:
@@ -1281,7 +1347,6 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         oldTotalTime = time.time()
-        success = False
         if len(sys.argv) > 1:
             if sys.argv[1] == "remake":
                 path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
@@ -1291,39 +1356,107 @@ if __name__ == "__main__":
                     print(chalk.red.bold("Folder does not exist. Exiting!"))
                     sys.exit(1)
                 halo = Halo(text='Remaking project...', spinner='dots')
+                if not os.path.exists(path + "/out"):
+                    os.makedirs(path + "/out")
+                if not os.path.exists(path + "/out/src"):
+                    os.makedirs(path + "/out/src")
+                if not os.path.exists(path + "/out/include"):
+                    os.makedirs(path + "/out/include")
+                if not os.path.exists(path + "/assets"):
+                    os.makedirs(path + "/assets")
                 halo._text = "Copying myself..."
                 shutil.copyfile('kurakura.py', path + '/kurakura.py')
                 halo._text = "Copying default.cfg..."
-                shutil.copyfile('default.cfg', path + '/default.cfg')
+                shutil.copyfile('assets/default.cfg', path + '/assets/default.cfg')
                 halo._text = "Copying uncrustify..."
-                shutil.copyfile('beautify.exe', path + '/beautify.exe')
+                shutil.copyfile('assets/beautify.exe', path + '/assets/beautify.exe')
                 halo.succeed("Done!")
             elif sys.argv[1] == "script":
                 print(chalk.bold.green("KuraScript v1.0.0"))
                 inferredScriptPath = sys.argv[2] if len(sys.argv) > 2 else None
                 if not inferredScriptPath or not os.path.exists(inferredScriptPath):
                     print(chalk.bold.yellow("Script doesn't exist. Inferring..."))
-                    inferredScriptPath = "compile.kura"
+                    inferredScriptPath = "build.py"
                     if not os.path.exists(inferredScriptPath):
                         print(chalk.bold.red("Script doesn't exist. Exiting!"))
                         sys.exit(1)
-                    iLine = 0
-                    compiled = False
-                    endedCompilation = False
-                    for x in open(inferredScriptPath, "r").read().split("\n"):
-                        iLine += 1
-                        if x.startswith("Compile-Kura"):
-                            path = x.split(" ")[1]
-                            if os.path.isfile(path):
-                                print(chalk.green.bold("Line " + str(iLine) + ": ") + "Detected compile source: " + path)
-                                pr = subprocess.Popen("py kurakura.py " + path, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                                out, err = pr.communicate()
-                                pr.wait()
-                                print(chalk.green.bold("Line " + str(iLine) + ": ") + "Compiled " + path + " + included (recursive)!")
-                            endedCompilation = True
-                    if not endedCompilation:
-                        print(chalk.bold.red("Script doesn't contain any compilation commands. Exiting!"))
-                        sys.exit(1)
+                print(chalk.bold.green("Running script..."))
+                data = ast.parse(io.open(inferredScriptPath, mode="r", encoding="utf-8").read())
+                for node in data.body:
+                    if isinstance(node, ast.Call):
+                        if type(node.func) == ast.Attribute:
+                            if node.func.attr == "compile":
+                                happyCompilationCommand()
+                            elif node.func.attr == "copy":
+                                shutil.copytree("out", node.args[0].value, dirs_exist_ok=True)
+                                print(chalk.bold.green("Copied!"))
+                            elif node.func.attr == "zip":
+                                make_archive("out", node.args[0].value)
+                                print(chalk.bold.green("Zipped!"))
+                            elif node.func.attr == "clean":
+                                if os.path.exists(node.args[0].value + "/out"):
+                                    shutil.rmtree(node.args[0].value + "/out")
+                                if os.path.exists(node.args[0].value + "/pkg.zip"):
+                                    os.remove(node.args[0].value + "/pkg.zip")
+                                print(chalk.bold.green("Cleaned!"))
+                            elif node.func.attr == "cmd":
+                                proc = subprocess.Popen(node.args[0].value, shell=True)
+                                proc.wait()
+                                if proc.returncode == 0:
+                                    print(chalk.bold.green("Ran!"))
+                                else:
+                                    print(chalk.bold.red("Failed to run!"))
+                                    sys.exit(1)
+                    elif isinstance(node, ast.Expr):
+                        if type(node.value) == ast.Call:
+                            if type(node.value.func) == ast.Attribute:
+                                if node.value.func.attr == "compile":
+                                    happyCompilationCommand()
+                                elif node.value.func.attr == "copy":
+                                    shutil.copytree("out", node.value.args[0].value, dirs_exist_ok=True)
+                                    print(chalk.bold.green("Copied!"))
+                                elif node.value.func.attr == "zip":
+                                    make_archive("out", node.value.args[0].value)
+                                    print(chalk.bold.green("Zipped!"))
+                                elif node.value.func.attr == "clean":
+                                    if os.path.exists(node.value.args[0].value + "/out"):
+                                        shutil.rmtree(node.value.args[0].value + "/out")
+                                    if os.path.exists(node.value.args[0].value + "/pkg.zip"):
+                                        os.remove(node.value.args[0].value + "/pkg.zip")
+                                    print(chalk.bold.green("Cleaned!"))
+                                elif node.value.func.attr == "cmd":
+                                    proc = subprocess.Popen(node.value.args[0].value, shell=True)
+                                    proc.wait()
+                                    if proc.returncode == 0:
+                                        print(chalk.bold.green("Ran!"))
+                                    else:
+                                        print(chalk.bold.red("Failed to run!"))
+                                        sys.exit(1)
+                            elif type(node.value.func) == ast.Name:
+                                if node.value.func.id == "compile":
+                                    happyCompilationCommand()
+                                elif node.value.func.id == "copy":
+                                    if os.path.exists(node.value.args[0].value):
+                                        shutil.rmtree(node.value.args[0].value)
+                                    shutil.copytree("out", node.value.args[0].value)
+                                    print(chalk.bold.green("Copied!"))
+                                elif node.value.func.id == "clean":
+                                    if os.path.exists(node.value.args[0].value + "/out"):
+                                        shutil.rmtree(node.value.args[0].value + "/out")
+                                    if os.path.exists(node.value.args[0].value + "/pkg.zip"):
+                                        os.remove(node.value.args[0].value + "/pkg.zip")
+                                    print(chalk.bold.green("Cleaned!"))
+                                elif node.value.func.id == "zip":
+                                    make_archive("out", node.value.args[0].value)
+                                    print(chalk.bold.green("Zipped!"))
+                                elif node.value.func.id == "cmd":
+                                    proc = subprocess.Popen(node.value.args[0].value, shell=True)
+                                    proc.wait()
+                                    if proc.returncode == 0:
+                                        print(chalk.bold.green("Ran!"))
+                                    else:
+                                        print(chalk.bold.red("Failed to run!"))
+                                        sys.exit(1)
             elif sys.argv[1] == "new":
                 path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
                 if os.path.exists(path):
@@ -1333,9 +1466,10 @@ if __name__ == "__main__":
                 os.makedirs(path + "/out")
                 os.makedirs(path + "/out/src")
                 os.makedirs(path + "/out/include")
+                os.makedirs(path + "/assets")
                 open(path + "/main.py", "w").write("def main() -> int:\n\treturn 0\n")
-                open(path + "/default.cfg", "w").write(io.open("default.cfg", mode="r", encoding="utf-8").read())
-                open(path + "/beautify.exe", "wb").write(io.open("beautify.exe", mode="rb").read())
+                open(path + "/assets/default.cfg", "w").write(io.open("assets/default.cfg", mode="r", encoding="utf-8").read())
+                open(path + "/assets/beautify.exe", "wb").write(io.open("assets/beautify.exe", mode="rb").read())
                 io.open(path + "/kurakura.py", mode="w", encoding="utf-8").write(io.open("kurakura.py", mode="r", encoding="utf-8").read())
             elif sys.argv[1] == "deinit":
                 if detect_project('.'):
@@ -1347,8 +1481,8 @@ if __name__ == "__main__":
                 print(chalk.bold.red("This action cannot be undone!"))
                 print(chalk.bold.red("Type 'yes' to confirm."))
                 if input("> ") == "yes":
-                    if os.path.isfile('plugins.json'):
-                        os.remove('plugins.json')
+                    if os.path.isfile('assets/plugins.json'):
+                        os.remove('assets/plugins.json')
                     if os.path.exists('plugins'):
                         shutil.rmtree('plugins')
                     if os.path.exists('out'):
@@ -1357,8 +1491,8 @@ if __name__ == "__main__":
                         os.remove('pkg.zip')
                     if os.path.exists('kurakura.compiled.py'):
                         os.remove('kurakura.compiled.py')
-                    os.remove('default.cfg')
-                    os.remove('beautify.exe')
+                    os.remove('assets/default.cfg')
+                    os.remove('assets/beautify.exe')
                     for root, dirs, files in os.walk('.'):
                         for file in files:
                             if file.endswith('.py') and file != 'kurakura.py':
@@ -1380,19 +1514,6 @@ if __name__ == "__main__":
                     os.remove(path + "/pkg.zip")
                     print(chalk.bold.green("Cleaned package!"))
                 print(chalk.bold.green("All done!"))
-            #elif sys.argv[1] == "toolchain":
-            #    print(chalk.bold.green("Minifying toolchain..."))
-            #    text = io.open("kurakura.py", mode="r", encoding="utf-8").read()
-            #    min = python_minifier.minify(text)
-            #    io.open("dist/kurakura.py", mode="w", encoding="utf-8").write(min)
-            #    print(chalk.bold.green("Minified toolchain!"))
-            #    print(chalk.bold.green("Copying to main directory..."))
-            #    shutil.copyfile('dist/kurakura.py', 'kurakura.compiled.py')
-            #    print(chalk.bold.green("Copied to main directory!"))
-            #    print(chalk.bold.green("Cleaning up..."))
-            #    shutil.rmtree('dist')
-            #    print(chalk.bold.blue("You may now distribute the optimized toolchain."))
-            #    print(chalk.bold.green("All done!"))
             elif sys.argv[1] == "del":
                 if sys.argv[2] == ".":
                     print(chalk.red.bold("Cannot delete current directory. Exiting!"))
@@ -1420,11 +1541,11 @@ if __name__ == "__main__":
                         print(chalk.red.bold("Plugin does not exist. Exiting!"))
                         sys.exit(1)
                     print(chalk.bold.green("Installing plugin..."))
-                    if not os.path.isfile("plugins.json"):
-                        open("plugins.json", "w").write("{}")
-                    plugins = json.loads(open("plugins.json", "r").read())
+                    if not os.path.isfile("assets/plugins.json"):
+                        open("assets/plugins.json", "w").write("{}")
+                    plugins = json.loads(open("assets/plugins.json", "r").read())
                     plugins[plugin] = "1.0.0"
-                    open("plugins.json", "w").write(json.dumps(plugins))
+                    open("assets/plugins.json", "w").write(json.dumps(plugins))
                     print(chalk.bold.green("Installed plugin!"))
                 elif sys.argv[2] == "remove":
                     plugin = sys.argv[3] if len(sys.argv) > 3 else input("Enter plugin name: ")
@@ -1434,11 +1555,11 @@ if __name__ == "__main__":
                         print(chalk.red.bold("Plugin does not exist. Exiting!"))
                         sys.exit(1)
                     print(chalk.bold.green("Uninstalling plugin..."))
-                    if not os.path.isfile("plugins.json"):
-                        open("plugins.json", "w").write("{}")
-                    plugins = json.loads(open("plugins.json", "r").read())
+                    if not os.path.isfile("assets/plugins.json"):
+                        open("assets/plugins.json", "w").write("{}")
+                    plugins = json.loads(open("assets/plugins.json", "r").read())
                     del plugins[plugin]
-                    open("plugins.json", "w").write(json.dumps(plugins))
+                    open("assets/plugins.json", "w").write(json.dumps(plugins))
                     print(chalk.bold.green("Uninstalled plugin!"))
             elif sys.argv[1] == "pkg":
                 path = sys.argv[2] if len(sys.argv) > 2 else input("Enter project name: ")
@@ -1493,53 +1614,4 @@ if __name__ == "__main__":
                 print(chalk.bold.red("Unknown command. Exiting!"))
                 sys.exit(1)
         else:
-            print(chalk.bold.red("No input files. Will attempt to infer from current directory."))
-            if os.path.isfile('main.py'):
-                print(chalk.bold.green("Detected main.py!"))
-                if os.path.exists('out'):
-                    shutil.rmtree('out')
-                print(chalk.bold.green("- Compiling main.py..."))
-                parse('main.py', "")
-                print(chalk.bold.magentaBright("Done!") + " Output is in " + chalk.bold.blue("out/"))
-                success = True
-            else:
-                print(chalk.bold.red("Could not find main.py! Exiting!"))
-                sys.exit(1)
-        if success == True:
-            print(chalk.bold.green("Beautifying..."))
-            for root, dirs, files in os.walk('out/src'):
-                for file in files:
-                    if file.endswith('.cpp'):
-                        print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
-                        p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-                        (output, err) = p.communicate()
-                        p_status = p.wait()
-                        print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
-                        if len(output.strip()) > 0:
-                            print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
-                        elif len(err.strip()) > 0:
-                            print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
-            for root, dirs, files in os.walk('out/include'):
-                for file in files:
-                    if file.endswith('.h'):
-                        print(" - " + chalk.blue.bold("Beautifying ") + os.path.join(root, file) + "...")
-                        p = subprocess.Popen('beautify.exe -c default.cfg -f ' + os.path.join(root, file) + ' -o ' + os.path.join(root, file), shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-                        (output, err) = p.communicate()
-                        p_status = p.wait()
-                        print(" - " + chalk.green.bold("Beautified ") + os.path.join(root, file) + "...")
-                        if len(output.strip()) > 0:
-                            print(" - " + chalk.blue.magenta("Output") + ": " + output.decode("utf-8"))
-                        elif len(err.strip()) > 0:
-                            print(" - " + chalk.red.bold("Error") + ": " + err.decode("utf-8"))
-            for root, dirs, files in os.walk('out/src'):
-                for file in files:
-                    if file.endswith('~'):
-                        os.remove(os.path.join(root, file))
-            for root, dirs, files in os.walk('out/include'):
-                for file in files:
-                    if file.endswith('~'):
-                        os.remove(os.path.join(root, file))
-            print(chalk.bold.magentaBright("Done!"))
-            print(chalk.bold.green("All done!"))
-            newTotalTime = time.time()
-            print(chalk.bold.green("Total time taken: ") + chalk.bold.magenta(str(round(newTotalTime - oldTotalTime, 2))) + " seconds.")
+            happyCompilationCommand()
