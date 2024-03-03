@@ -169,5 +169,3 @@ To add or remove a plugin, it will have to be in the ```plugins/``` folder.
 ## Reporting bugs
 - Please go to the issues or [DM me](https://discordapp.com/users/1021090674289942600) tab in order to report a bug.
 - To fix a bug (most preferred), please create a pull request.
-
-### ~242D
